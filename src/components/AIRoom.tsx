@@ -18,10 +18,13 @@ const AIRoom = () => {
 
   useEffect(() => {
     if (room && audioContextInitialized) {
-      const handleTrackPublished = (publication: RemoteTrackPublication, participant: RemoteParticipant) => {
-        console.log('Remote track published:', publication.trackSid, participant.identity);
-        if (publication.kind === Track.Kind.Audio) {
+      const handleTrackSubscribed = (track: Track, publication: RemoteTrackPublication, participant: RemoteParticipant) => {
+        console.log('Track subscribed:', track.sid, participant.identity);
+        if (track.kind === Track.Kind.Audio) {
           setAudioInputEnabled(true);
+          const audioElement = new Audio();
+          audioElement.srcObject = new MediaStream([track.mediaStreamTrack]);
+          audioElement.play().catch(error => console.error('Failed to play audio:', error));
         }
       };
 
@@ -32,11 +35,11 @@ const AIRoom = () => {
         }
       };
 
-      room.on(RoomEvent.TrackPublished, handleTrackPublished);
+      room.on(RoomEvent.TrackSubscribed, handleTrackSubscribed);
       room.on(RoomEvent.LocalTrackPublished, handleLocalTrackPublished);
 
       return () => {
-        room.off(RoomEvent.TrackPublished, handleTrackPublished);
+        room.off(RoomEvent.TrackSubscribed, handleTrackSubscribed);
         room.off(RoomEvent.LocalTrackPublished, handleLocalTrackPublished);
       };
     }
@@ -58,7 +61,7 @@ const AIRoom = () => {
       ) : (
         <p>Waiting for Voice Assistant...</p>
       )}
-      {audioContextInitialized && <VoiceAssistantUI isAudioEnabled={audioInputEnabled} audioContextInitialized={audioContextInitialized} />}
+      {audioContextInitialized && <VoiceAssistantUI isAudioEnabled={audioInputEnabled} audioContextInitialized={audioContextInitialized} room={room} />}
     </div>
   );
 };
