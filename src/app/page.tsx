@@ -1,52 +1,44 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
-import { LiveKitRoom } from '@livekit/components-react';
+import { LiveKitRoom, RoomAudioRenderer, ControlBar } from '@livekit/components-react';
 import '@livekit/components-styles';
 import AIRoom from '../components/AIRoom';
 
 export default function Home() {
-  const [token, setToken] = useState<string | null>(null);
-  const [url, setUrl] = useState<string | null>(null);
-  const [roomName, setRoomName] = useState<string | null>(null);
+  const [token, setToken] = useState('');
+  const [roomName, setRoomName] = useState('');
 
-  const connectToAI = async () => {
-    try {
+  useEffect(() => {
+    const fetchToken = async () => {
       const response = await fetch('/api/get-participant-token');
-      const { token, roomName } = await response.json();
-      setToken(token);
-      setRoomName(roomName);
-      setUrl(process.env.NEXT_PUBLIC_LIVEKIT_URL || '');
-    } catch (error) {
-      console.error('Error connecting to AI:', error);
-    }
-  };
+      const data = await response.json();
+      setToken(data.token);
+      setRoomName(data.roomName);
+    };
+
+    fetchToken();
+  }, []);
+
+  if (!token || !roomName) {
+    return <div>Loading...</div>;
+  }
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-between p-24">
-      <div className="z-10 max-w-5xl w-full items-center justify-between font-mono text-sm lg:flex">
-        <p className="fixed left-0 top-0 flex w-full justify-center border-b border-gray-300 bg-gradient-to-b from-zinc-200 pb-6 pt-8 backdrop-blur-2xl dark:border-neutral-800 dark:bg-zinc-800/30 dark:from-inherit lg:static lg:w-auto lg:rounded-xl lg:border lg:bg-gray-200 lg:p-4 lg:dark:bg-zinc-800/30">
-          AI Voice Assistant Demo
-        </p>
-        <div className="fixed bottom-0 left-0 flex h-48 w-full items-end justify-center bg-gradient-to-t from-white via-white dark:from-black dark:via-black lg:static lg:h-auto lg:w-auto lg:bg-none">
-          <ConnectButton />
-        </div>
-      </div>
-
-      <div className="relative flex place-items-center">
-        {token === null ? (
-          <button
-            onClick={connectToAI}
-            className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
-          >
-            Connect to AI
-          </button>
-        ) : (
-          <LiveKitRoom token={token} serverUrl={url || ''} connect={true} room={roomName || undefined}>
-            <AIRoom />
-          </LiveKitRoom>
-        )}
-      </div>
+      <ConnectButton />
+      <LiveKitRoom
+        video={false}
+        audio={true}
+        token={token}
+        serverUrl={process.env.NEXT_PUBLIC_LIVEKIT_URL}
+        data-lk-theme="default"
+        style={{ height: '100vh' }}
+      >
+        <AIRoom />
+        <RoomAudioRenderer />
+        <ControlBar />
+      </LiveKitRoom>
     </main>
   );
 }
