@@ -7,9 +7,17 @@ const AIRoom = () => {
   const room = useRoomContext();
   const participants = useParticipants();
   const [audioInputEnabled, setAudioInputEnabled] = useState(false);
+  const [audioContextInitialized, setAudioContextInitialized] = useState(false);
+
+  const initializeAudioContext = () => {
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    audioContext.resume().then(() => {
+      setAudioContextInitialized(true);
+    });
+  };
 
   useEffect(() => {
-    if (room) {
+    if (room && audioContextInitialized) {
       const handleTrackPublished = (publication: RemoteTrackPublication, participant: RemoteParticipant) => {
         console.log('Remote track published:', publication.trackSid, participant.identity);
         if (publication.kind === Track.Kind.Audio) {
@@ -32,7 +40,7 @@ const AIRoom = () => {
         room.off(RoomEvent.LocalTrackPublished, handleLocalTrackPublished);
       };
     }
-  }, [room]);
+  }, [room, audioContextInitialized]);
 
   if (!room) {
     return <div>Loading...</div>;
@@ -42,12 +50,15 @@ const AIRoom = () => {
     <div style={{ fontFamily: 'Arial, sans-serif', maxWidth: '600px', margin: '0 auto', padding: '20px' }}>
       <h1 style={{ color: '#333' }}>LiveKit Room: {room.name || 'Connecting...'}</h1>
       <h2 style={{ color: '#666' }}>Participants: {participants.length}</h2>
+      {!audioContextInitialized && (
+        <button onClick={initializeAudioContext}>Initialize Audio</button>
+      )}
       {audioInputEnabled ? (
         <p>Voice Assistant Active</p>
       ) : (
         <p>Waiting for Voice Assistant...</p>
       )}
-      <VoiceAssistantUI isAudioEnabled={audioInputEnabled} />
+      {audioContextInitialized && <VoiceAssistantUI isAudioEnabled={audioInputEnabled} audioContextInitialized={audioContextInitialized} />}
     </div>
   );
 };

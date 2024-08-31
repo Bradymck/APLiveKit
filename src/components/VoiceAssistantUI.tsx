@@ -1,23 +1,27 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { RoomAudioRenderer } from '@livekit/components-react';
 
-const VoiceAssistantUI = ({ isAudioEnabled }: { isAudioEnabled: boolean }) => {
+const VoiceAssistantUI = ({ isAudioEnabled, audioContextInitialized }: { isAudioEnabled: boolean, audioContextInitialized: boolean }) => {
   const [messages, setMessages] = useState<string[]>([]);
   const [input, setInput] = useState<string>('');
   const [ws, setWs] = useState<WebSocket | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<string>('Disconnected');
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [connectionAttempts, setConnectionAttempts] = useState(0);
 
   const connectWebSocket = useCallback(() => {
-    if (isAudioEnabled) {
+    if (isAudioEnabled && audioContextInitialized && connectionAttempts < 5) {
       const websocketUrl = process.env.NEXT_PUBLIC_WEBSOCKET_URL || 'ws://localhost:8000/ws';
-      console.log('Attempting to connect to WebSocket:', websocketUrl);
+      console.log(`Attempting to connect to WebSocket (Attempt ${connectionAttempts + 1}):`, websocketUrl);
+      setConnectionStatus('Connecting...');
+      
       const websocket = new WebSocket(websocketUrl);
 
       websocket.onopen = () => {
         console.log('WebSocket connected');
         setConnectionStatus('Connected');
         setWs(websocket);
+        setConnectionAttempts(0);
       };
 
       websocket.onmessage = (event) => {
@@ -26,7 +30,7 @@ const VoiceAssistantUI = ({ isAudioEnabled }: { isAudioEnabled: boolean }) => {
         try {
           let parsedMessage;
           if (typeof message === 'string' && message.startsWith('Assistant:')) {
-            parsedMessage = { text: message.substring(11).trim() };
+            parsedMessage = JSON.parse(message.substring(11).trim());
           } else {
             parsedMessage = JSON.parse(message);
           }
@@ -56,21 +60,27 @@ const VoiceAssistantUI = ({ isAudioEnabled }: { isAudioEnabled: boolean }) => {
 
       websocket.onerror = (error) => {
         console.error('WebSocket error:', error);
-        setConnectionStatus('Error: ' + error.toString());
+        setConnectionStatus('Error: Connection failed');
       };
 
       websocket.onclose = (event) => {
         console.log('WebSocket closed:', event.code, event.reason);
         setConnectionStatus('Disconnected');
         setWs(null);
-        // Attempt to reconnect after 5 seconds
-        setTimeout(connectWebSocket, 5000);
+        setConnectionAttempts((prevAttempts) => prevAttempts + 1);
+        if (connectionAttempts < 4) {
+          console.log(`Attempting to reconnect in 5 seconds (Attempt ${connectionAttempts + 2})`);
+          setTimeout(connectWebSocket, 5000);
+        } else {
+          console.log('Max reconnection attempts reached. Please try again later.');
+          setConnectionStatus('Connection failed. Please try again later.');
+        }
       };
     }
-  }, [isAudioEnabled]);
+  }, [isAudioEnabled, audioContextInitialized, connectionAttempts]);
 
   useEffect(() => {
-    if (isAudioEnabled) {
+    if (isAudioEnabled && audioContextInitialized) {
       connectWebSocket();
     }
     return () => {
@@ -78,7 +88,7 @@ const VoiceAssistantUI = ({ isAudioEnabled }: { isAudioEnabled: boolean }) => {
         ws.close();
       }
     };
-  }, [isAudioEnabled, connectWebSocket]);
+  }, [isAudioEnabled, audioContextInitialized, connectWebSocket]);
 
   useEffect(() => {
     if (audioUrl) {

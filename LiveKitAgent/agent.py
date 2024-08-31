@@ -33,7 +33,8 @@ async def entrypoint(ctx: JobContext):
 
     await asyncio.sleep(1)
 
-    await assistant.say("Hey, how can I help you today?", allow_interruptions=True)
+    audio_data = await assistant.generate_audio("Hey, how can I help you today?")
+    await assistant.say("Hey, how can I help you today?", allow_interruptions=True, audio_data=audio_data)
 
     # Keep the assistant running and processing audio input
     while True:
