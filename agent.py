@@ -3,6 +3,8 @@ import logging
 from dotenv import load_dotenv
 import os
 import websockets
+import json
+import base64
 
 from livekit.agents import AutoSubscribe, JobContext, Worker, WorkerOptions
 from livekit.agents.voice_assistant import VoiceAssistant
@@ -37,7 +39,10 @@ def prewarm_fnc(proc):
         logger.error(f"Error preloading VAD model: {e}")
         raise
 
+assistant = None
+
 async def entrypoint(ctx: JobContext):
+    global assistant
     try:
         initial_ctx = openai.ChatContext().append(
             role="system",
@@ -79,33 +84,17 @@ async def main():
         worker_options = WorkerOptions(
             entrypoint_fnc=entrypoint,
             prewarm_fnc=prewarm_fnc,
-            ws_url=os.getenv("LIVEKIT_URL")  # Ensure the correct URL is used
+            ws_url=os.getenv("LIVEKIT_URL")
         )
         worker = Worker(worker_options)
-        await worker.run()
+        
+        await asyncio.gather(
+            worker.run(),
+            start_server()
+        )
     except Exception as e:
         logger.error(f"An error occurred in the main function: {e}")
         raise
 
-async def websocket_handler(websocket, path):
-    async for message in websocket:
-        # Process the message and get the response from the assistant
-        response = await process_message(message)
-        await websocket.send(response)
-
-async def process_message(message):
-    # Here you would integrate with the VoiceAssistant to process the message
-    # For now, we'll just echo the message
-    return f"Assistant: {message}"
-
-async def start_server():
-    server = await websockets.serve(websocket_handler, "localhost", 8000)
-    await server.wait_closed()
-
 if __name__ == "__main__":
-    try:
-        asyncio.run(start_server())
-    except KeyboardInterrupt:
-        logger.info("Application stopped by user")
-    except Exception as e:
-        logger.error(f"An unexpected error occurred: {e}")
+    asyncio.run(main())
