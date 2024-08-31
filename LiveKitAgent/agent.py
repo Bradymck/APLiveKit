@@ -27,9 +27,17 @@ async def entrypoint(ctx: JobContext):
 
     assistant.start(ctx.room)
 
+    # Set up audio input handling
+    audio_track = await ctx.create_audio_track()
+    await ctx.room.local_participant.publish_track(audio_track)
+
     await asyncio.sleep(1)
 
     await assistant.say("Hey, how can I help you today?", allow_interruptions=True)
+
+    # Keep the assistant running and processing audio input
+    while True:
+        await asyncio.sleep(0.1)
 
 if __name__ == "__main__":
     run_app(Worker(entrypoint))

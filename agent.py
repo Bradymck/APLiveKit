@@ -79,6 +79,47 @@ async def entrypoint(ctx: JobContext):
         logger.error(f"An error occurred in the entrypoint: {e}")
         raise
 
+async def process_message(message):
+    global assistant
+    if assistant is None:
+        return json.dumps({"text": "Assistant is not initialized", "audio": None})
+    
+    try:
+        parsed_message = json.loads(message)
+        input_text = parsed_message.get('text', '')
+    except json.JSONDecodeError:
+        input_text = message
+
+    response_text = await assistant.process_input(input_text)
+    audio_data = await assistant.generate_audio(response_text)
+    
+    print(f"Generated audio data length: {len(audio_data) if audio_data else 'None'}")
+    
+    return json.dumps({
+        "text": response_text,
+        "audio": base64.b64encode(audio_data).decode('utf-8') if audio_data else None
+    })
+
+
+async def websocket_handler(websocket, path):
+    try:
+        async for message in websocket:
+            print(f"Received message: {message}")
+            response = await process_message(message)
+            print(f"Sending response: {response}")
+            await websocket.send(response)
+    except websockets.exceptions.ConnectionClosed:
+        print("WebSocket connection closed")
+
+
+async def start_server():
+    server = await websockets.serve(
+        websocket_handler,
+        "localhost",
+        8000
+    )
+    await server.wait_closed()
+
 async def main():
     try:
         worker_options = WorkerOptions(

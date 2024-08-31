@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { RoomAudioRenderer } from '@livekit/components-react';
 
 const VoiceAssistantUI = ({ isAudioEnabled }: { isAudioEnabled: boolean }) => {
   const [messages, setMessages] = useState<string[]>([]);
@@ -21,17 +22,34 @@ const VoiceAssistantUI = ({ isAudioEnabled }: { isAudioEnabled: boolean }) => {
 
       websocket.onmessage = (event) => {
         const message = event.data;
-        console.log('Received message from server:', message);
+        console.log('Raw message from server:', message);
         try {
-          const parsedMessage = JSON.parse(message);
-          setMessages((prevMessages) => [...prevMessages, parsedMessage.text || parsedMessage]);
+          let parsedMessage;
+          if (typeof message === 'string' && message.startsWith('Assistant:')) {
+            parsedMessage = { text: message.substring(11).trim() };
+          } else {
+            parsedMessage = JSON.parse(message);
+          }
+          console.log('Parsed message:', parsedMessage);
+          setMessages((prevMessages) => [...prevMessages, parsedMessage.text]);
           if (parsedMessage.audio) {
-            const blob = new Blob([parsedMessage.audio], { type: 'audio/mp3' });
+            console.log('Audio data received, length:', parsedMessage.audio.length);
+            const audioData = atob(parsedMessage.audio);
+            const arrayBuffer = new ArrayBuffer(audioData.length);
+            const view = new Uint8Array(arrayBuffer);
+            for (let i = 0; i < audioData.length; i++) {
+              view[i] = audioData.charCodeAt(i);
+            }
+            const blob = new Blob([arrayBuffer], { type: 'audio/mp3' });
             const url = URL.createObjectURL(blob);
             setAudioUrl(url);
+            console.log('Audio URL created:', url);
+          } else {
+            console.log('No audio data in the message');
           }
         } catch (error) {
           console.error('Error parsing message:', error);
+          console.error('Raw message causing error:', message);
           setMessages((prevMessages) => [...prevMessages, message]);
         }
       };
@@ -62,9 +80,18 @@ const VoiceAssistantUI = ({ isAudioEnabled }: { isAudioEnabled: boolean }) => {
     };
   }, [isAudioEnabled, connectWebSocket]);
 
+  useEffect(() => {
+    if (audioUrl) {
+      const audio = new Audio(audioUrl);
+      audio.play().catch(error => console.error('Error playing audio:', error));
+    }
+  }, [audioUrl]);
+
   const sendMessage = () => {
     if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(input);
+      const message = JSON.stringify({ text: input });
+      console.log('Sending message:', message);
+      ws.send(message);
       setInput('');
     } else {
       console.error('WebSocket is not connected');
@@ -80,7 +107,7 @@ const VoiceAssistantUI = ({ isAudioEnabled }: { isAudioEnabled: boolean }) => {
           <div key={index} style={{ marginBottom: '5px' }}>{typeof msg === 'string' ? msg : JSON.stringify(msg)}</div>
         ))}
       </div>
-      {audioUrl && <audio src={audioUrl} autoPlay />}
+      <RoomAudioRenderer />
       <input
         type="text"
         value={input}
