@@ -4,7 +4,8 @@ from dotenv import load_dotenv
 import os
 import websockets
 
-from livekit.agents import AutoSubscribe, JobContext, Worker, WorkerOptions, VoiceAssistant
+from livekit.agents import AutoSubscribe, JobContext, Worker, WorkerOptions
+from livekit.agents.voice_assistant import VoiceAssistant
 from livekit.plugins import deepgram, openai, silero
 
 # Load environment variables

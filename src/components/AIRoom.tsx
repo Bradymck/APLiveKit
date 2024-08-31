@@ -1,21 +1,22 @@
-import { useRoomContext, useParticipants, useTracks } from '@livekit/components-react';
+import { useRoomContext, useParticipants } from '@livekit/components-react';
 import { useState, useCallback, useEffect } from 'react';
-import { Track, Room } from 'livekit-client';
 import VoiceAssistantUI from './VoiceAssistantUI';
-import { createLocalAudioTrack } from 'livekit-client';
+import { createLocalAudioTrack, LocalAudioTrack } from 'livekit-client';
 
 const AIRoom = () => {
   const room = useRoomContext();
   const participants = useParticipants();
-  const tracks = useTracks();
   const [audioInputEnabled, setAudioInputEnabled] = useState(false);
+  const [audioTrack, setAudioTrack] = useState<LocalAudioTrack | null>(null);
 
   const enableAudioInput = useCallback(async () => {
     if (room.localParticipant && !audioInputEnabled) {
       try {
-        const audioTrack = await createLocalAudioTrack();
-        await room.localParticipant.publishTrack(audioTrack);
+        const track = await createLocalAudioTrack();
+        setAudioTrack(track);
+        await room.localParticipant.publishTrack(track);
         setAudioInputEnabled(true);
+        console.log('Microphone enabled and track published');
       } catch (error) {
         console.error('Error enabling audio:', error);
       }
@@ -49,7 +50,7 @@ const AIRoom = () => {
       ) : (
         <p>Microphone enabled</p>
       )}
-      <VoiceAssistantUI />
+      <VoiceAssistantUI isAudioEnabled={audioInputEnabled} />
     </div>
   );
 };
